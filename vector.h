@@ -1,7 +1,13 @@
 #include <cstddef>
 #include <memory>
 #include <iostream>
+#include <concepts>
 
+template<typename a, typename b>
+concept same_size = sizeof(a) == sizeof(b);
+
+template<typename Derived, typename Base>
+concept emplaceable_from = same_size<Derived, Base> && std::derived_from<Derived, Base>;
 
 template<typename Base, typename Allocator = std::allocator<Base>> 
 class PolyVector {
@@ -21,6 +27,10 @@ public:
 
     // Modifiers
     void push_back(Base value);
+    template <typename Derived, typename... Args>
+    requires emplaceable_from<Derived, Base> 
+    void emplace_back(Args&&... args);
+    void pop_back();
     
 
 private:
@@ -115,4 +125,22 @@ void PolyVector<Base, Allocator>::push_back(Base value) {
     expand_if_full();
     new (data_ + size_) Base{value};
     size_++;
+}
+
+
+template<typename Base, typename Allocator> 
+template<typename Derived, typename... Args>
+requires emplaceable_from<Derived, Base>
+void PolyVector<Base, Allocator>::emplace_back(Args&&... args) {
+    expand_if_full();
+    new (data_ + size_) Derived(std::forward<Args>(args)...);
+    size_++;
+}
+
+template<typename Base, typename Allocator> 
+void PolyVector<Base, Allocator>::pop_back() {
+    if (size_ > 0) {
+        data_[size_ - 1].~Base();
+        size_--;
+    }
 }
