@@ -2,6 +2,7 @@
 #include <memory>
 #include <iostream>
 #include <concepts>
+#include <iterator>
 
 template<typename a, typename b>
 concept same_size = sizeof(a) == sizeof(b);
@@ -12,6 +13,55 @@ concept emplaceable_from = same_size<Derived, Base> && std::derived_from<Derived
 template<typename Base, typename Allocator = std::allocator<Base>> 
 class PolyVector {
 public:
+    // Member types
+    using value_type = Base;
+    using allocator_type = Allocator;
+    using size_type = size_t;
+    using reference = Base&;
+    using pointer = Base*;
+    class iterator {
+        public:
+            // Member types
+            using difference_type = std::ptrdiff_t;
+            using value_type = Base;
+            using reference = Base&;
+            using pointer = Base*;
+            using iterator_category = std::random_access_iterator_tag;
+
+            // Member functions
+            iterator() : mPtr{nullptr} {};
+            iterator(Base* ptr) : mPtr{ptr} {};
+            iterator(const iterator& other) : mPtr{other.mPtr} {};
+
+            
+            // operators
+            Base& operator*() const {
+                return *mPtr;
+            }
+
+            iterator& operator++() {
+                ++mPtr;
+                return *this;
+            }
+
+            iterator operator++(int) {
+                iterator tmp = *this;
+                ++(*this);
+                return tmp;
+            }
+
+            bool operator==(const iterator other) const {
+                return other.mPtr == mPtr;
+            }
+
+            bool operator!=(const iterator other) const {
+                return other.mPtr != mPtr;
+            }
+            
+        private:
+            Base* mPtr;
+    };
+
     // Member functions
     ~PolyVector();
 
@@ -20,6 +70,15 @@ public:
     Base& front();
     Base& back();
     Base* data();
+
+    // Iterators
+    iterator begin() {
+        return iterator(data_);
+    }
+
+    iterator end() {
+        return iterator(data_ + size_);
+    }
 
     // Capacity
     size_t size();
