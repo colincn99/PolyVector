@@ -67,6 +67,13 @@ public:
     // Member functions
     PolyVector() = default;
     PolyVector(std::initializer_list<Base> init);
+
+    PolyVector(PolyVector& other) = delete;
+    void operator=(PolyVector& other) = delete;
+
+    PolyVector(PolyVector&& other) = delete;
+    void operator=(PolyVector&& other) = delete;
+
     ~PolyVector();
 
     // Element access
