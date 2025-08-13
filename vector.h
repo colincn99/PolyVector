@@ -3,6 +3,8 @@
 #include <iostream>
 #include <concepts>
 #include <iterator>
+#include <cstring>
+#include <initializer_list>
 
 template<typename a, typename b>
 concept same_size = sizeof(a) == sizeof(b);
@@ -63,6 +65,8 @@ public:
     };
 
     // Member functions
+    PolyVector() = default;
+    PolyVector(std::initializer_list<Base> init);
     ~PolyVector();
 
     // Element access
@@ -83,8 +87,12 @@ public:
     // Capacity
     size_t size();
     void reserve(size_t new_capacity);
+    size_t capacity();
 
     // Modifiers
+    void clear();
+    void insert(const iterator pos, const Base& value);
+    void erase_value(const Base& value);
     void push_back(Base value);
     template <typename Derived, typename... Args>
     requires emplaceable_from<Derived, Base> 
@@ -110,12 +118,7 @@ void PolyVector<Base, Allocator>::trusted_reserve(size_t new_capacity) {
     Base* new_data = allocator.allocate(new_capacity);
     
     if (data_ != nullptr) {
-        for (size_t index = 0; index < capacity_; index++) {
-            new (new_data + index) Base{data_[index]};
-        } 
-        for (size_t index = 0; index < capacity_; index++) {
-            data_[index].~Base();
-        } 
+        std::memcpy(static_cast<void*>(new_data), static_cast<void*>(data_), sizeof(Base) * size_);
         allocator.deallocate(data_, capacity_);
     }
     data_ = new_data;
@@ -131,10 +134,17 @@ void PolyVector<Base, Allocator>::expand_if_full() {
 
 // Member functions
 template<typename Base, typename Allocator> 
+PolyVector<Base, Allocator>::PolyVector(std::initializer_list<Base> init) {
+    for (Base item : init) {
+        push_back(item);
+    }
+}
+
+template<typename Base, typename Allocator> 
 PolyVector<Base, Allocator>::~PolyVector() {
     if (data_ != nullptr) {
         Allocator allocator;
-        for (size_t index = 0; index < capacity_; index++) {
+        for (size_t index = 0; index < capacity_; ++index) {
             data_[index].~Base();
         } 
         allocator.deallocate(data_, capacity_);
@@ -177,13 +187,88 @@ void PolyVector<Base, Allocator>::reserve(size_t new_capacity) {
     }
 }
 
+template<typename Base, typename Allocator> 
+size_t PolyVector<Base, Allocator>::capacity() {
+    return capacity_;
+}
+
 // Modifiers
+
+template<typename Base, typename Allocator> 
+void PolyVector<Base, Allocator>::clear() {
+    for (size_t index = 0; index < capacity_; ++index) {
+        data_[index].~Base();
+    }
+    size_ = 0;
+}
+
+template<typename Base, typename Allocator> 
+void PolyVector<Base, Allocator>::insert(const iterator pos, const Base& value) {
+    if (data_ == nullptr) {
+        push_back(value);
+        return;
+    }
+
+    if (size_ == capacity_) {
+        size_t new_capacity = capacity_ * 2;
+        Allocator allocator;
+        Base* new_data = allocator.allocate(new_capacity);
+        
+        size_t insert_offset = std::addressof(*pos) - data_;
+
+        std::memcpy(static_cast<void*>(new_data), static_cast<void*>(data_), sizeof(Base) * insert_offset);
+        std::memmove(static_cast<void*>(new_data + insert_offset + 1), 
+                    static_cast<void*>(data_ + insert_offset),
+                    sizeof(Base) * (size_ - insert_offset));
+        new (new_data + insert_offset) Base{value};
+        allocator.deallocate(data_, capacity_);
+        data_ = new_data;
+        capacity_ = new_capacity;
+    }
+    else {
+        size_t insert_offset = std::addressof(*pos) - data_;
+        std::memmove(static_cast<void*>(data_ + insert_offset + 1), 
+                    static_cast<void*>(data_ + insert_offset),
+                    sizeof(Base) * (size_ - insert_offset));
+        new (data_ + insert_offset) Base{value};
+    }
+    ++size_;
+}
+
+template<typename Base, typename Allocator> 
+void PolyVector<Base, Allocator>::erase_value(const Base& value) {
+    size_t first;
+    for (first = 0; first < size_; ++first) {
+        if (data_[first] == value) {
+            data_[first].~Base();
+            break;        
+        }
+    }
+
+    if (first == size_) {
+        return;
+    }
+
+    size_t i;
+    for(i = first + 1; i < size_; ++i) {
+        if (data_[i] != value) {
+            std::memcpy(static_cast<void*>(data_ + first),
+                        static_cast<void*>(data_ + i),
+                        sizeof(Base));
+            ++first;
+        }
+        else {
+            data_[i].~Base();
+        }
+    }
+    size_ -= i - first; 
+}
 
 template<typename Base, typename Allocator> 
 void PolyVector<Base, Allocator>::push_back(Base value) {
     expand_if_full();
     new (data_ + size_) Base{value};
-    size_++;
+    ++size_;
 }
 
 
@@ -193,7 +278,7 @@ requires emplaceable_from<Derived, Base>
 void PolyVector<Base, Allocator>::emplace_back(Args&&... args) {
     expand_if_full();
     new (data_ + size_) Derived(std::forward<Args>(args)...);
-    size_++;
+    ++size_;
 }
 
 template<typename Base, typename Allocator> 
