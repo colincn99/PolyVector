@@ -1,3 +1,6 @@
+#ifndef POLYVECTOR_H
+#define POLYVECTOR_H 
+
 #include <cstddef>
 #include <memory>
 #include <iostream>
@@ -295,3 +298,5 @@ void PolyVector<Base, Allocator>::pop_back() {
         size_--;
     }
 }
+
+#endif
