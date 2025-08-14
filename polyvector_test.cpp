@@ -1,7 +1,9 @@
 #include <iostream>
 #include <cstddef>
 #include <iterator>
-#include "vector.h"
+#include "polyvector.h"
+#include "doctest.h"
+
 
 using std::cout, std::endl;
 
