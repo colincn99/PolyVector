@@ -1,107 +1,201 @@
-#include <iostream>
-#include <cstddef>
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "doctest.h"
 #include <iterator>
 #include "polyvector.h"
-#include "doctest.h"
 
-
-using std::cout, std::endl;
-
-
+enum Type {BaseT, DerivedT};
 
 class Base {
 public:
-    virtual void print() {
-        cout << "Base" << endl;
+    virtual Type get_type() {
+        return BaseT;
     }
 };
 
 class Derived : public Base {
 public:
-    virtual void print() {
-        cout << "Derived" << endl;
+    virtual Type get_type() {
+        return DerivedT;
     }
 };
 
+TEST_CASE("Concepts") {
+    CHECK(same_size<Derived, Base>);
+    CHECK(!same_size<char, long long int>);
 
-int main() {
+    CHECK(emplaceable_from<Base, Base>);
+    CHECK(emplaceable_from<Derived, Base>);
+    CHECK(emplaceable_from<Derived, Derived>);
+    CHECK(!emplaceable_from<Base, Derived>);
+
+    CHECK(std::forward_iterator<PolyVector<int>::iterator>);
+}
+
+TEST_CASE("Initializer list") {
+    PolyVector<int> vec{1, 2, 3, 4};
+
+    CHECK(vec[0] == 1);
+    CHECK(vec[1] == 2);
+    CHECK(vec[2] == 3);
+    CHECK(vec[3] == 4);
+}
+
+TEST_CASE("Two element Accessors") {
+    PolyVector<int> vec{1, 2};
+
+    CHECK(vec[0] == 1);
+    CHECK(vec[1] == 2);
+    CHECK(vec.front() == 1);
+    CHECK(vec.back() == 2);
+    CHECK(*vec.data() == 1);
+    CHECK(*(vec.data() + 1) == 2);
+}
+
+TEST_SUITE_BEGIN("Iterators");
+TEST_CASE("Iterator for") {
+    PolyVector<int> vec{1, 2, 3, 4};
+    
+    int i = 0;
+    for (auto it = vec.begin(); it != vec.end(); ++it) {
+        CHECK(*it == vec[i]);
+        ++i;
+    }
+}
+
+TEST_CASE("Range for") {
+    PolyVector<int> vec{1, 2, 3, 4};
+    
+    int i = 0;
+    for (auto item : vec) {
+        CHECK(item == vec[i]);
+        ++i;
+    }
+}
+TEST_SUITE_END();
+
+TEST_SUITE_BEGIN("Capacity");
+TEST_CASE("initial size 0") {
+    PolyVector<int> vec;
+
+    CHECK(vec.size() == 0);
+    CHECK(vec.capacity() == 0);
+}
+
+TEST_CASE("initial size 2") {
+    PolyVector<int> vec{1, 2};
+
+    CHECK(vec.size() == 2);
+    CHECK(vec.capacity() == 2);
+}
+
+TEST_CASE("Reserve no elements") {
+    PolyVector<int> vec;
+    vec.reserve(1);
+
+    CHECK(vec.size() == 0);
+    CHECK(vec.capacity() == 1);
+}
+
+TEST_CASE("Reserve with elements") {
+    PolyVector<int> vec{1, 2};
+    vec.reserve(10);
+
+    CHECK(vec.size() == 2);
+    CHECK(vec.capacity() == 10);
+
+    CHECK(vec[0] == 1);
+    CHECK(vec[1] == 2);
+}
+
+TEST_CASE("Increase size only") {
+    PolyVector<int> vec{1, 2, 3};
+    CHECK(vec.size() == 3);
+    CHECK(vec.capacity() == 4);
+
+    vec.push_back(1);
+
+    CHECK(vec.size() == 4);
+    CHECK(vec.capacity() == 4);
+}
+
+TEST_CASE("Increase size and capacity empty") {
+    PolyVector<int> vec;
+    vec.push_back(1);
+
+    CHECK(vec.size() == 1);
+    CHECK(vec.capacity() == 1);
+}
+TEST_CASE("Increase size and capacity non-empty") {
+    PolyVector<int> vec{1, 2, 3, 4};
+    vec.push_back(1);
+
+    CHECK(vec.size() == 5);
+    CHECK(vec.capacity() == 8);
+}
+
+TEST_CASE("Reserve less than current") {
+    PolyVector<int> vec{1, 2};
+    vec.reserve(1);
+
+    CHECK(vec.size() == 2);
+    CHECK(vec.capacity() == 2);
+}
+
+TEST_SUITE_BEGIN("Modifiers");
+TEST_CASE("clear") {
+    PolyVector<int> vec {1,2};
+
+    CHECK(vec.size() == 2);
+    CHECK(vec.capacity() == 2);
+
+    vec.clear();
+
+    CHECK(vec.size() == 0);
+    CHECK(vec.capacity() == 2);
+}
+
+TEST_CASE("insert") {
+    PolyVector<int> vec{1, 2, 3};
+    vec.insert(++vec.begin(), 5);
+    
+    CHECK(vec[0] == 1);
+    CHECK(vec[1] == 5);
+    CHECK(vec[2] == 2);
+    CHECK(vec[3] == 3);
+}
+
+TEST_CASE("erase_value") {
+    PolyVector vec {0, 0, 1, 0, 2, 0, 3, 0};
+    vec.erase_value(0);
+
+    CHECK(vec[0] == 1);
+    CHECK(vec[1] == 2);
+    CHECK(vec[2] == 3);
+}
+
+TEST_CASE("push_back") {
+    PolyVector<int> vec;
+    vec.push_back(1);
+    vec.push_back(2);
+    vec.push_back(3);
+
+    CHECK(vec[0] == 1);
+    CHECK(vec[1] == 2);
+    CHECK(vec[2] == 3);
+}
+
+TEST_CASE("pop_back") {
+    PolyVector<int> vec{1, 2, 3};
+    vec.pop_back();
+    
+    CHECK(vec.size() == 2);
+    CHECK(vec[0] == 1);
+    CHECK(vec[1] == 2);
+}
+TEST_SUITE_END();
+/**
+
+
     static_assert(emplaceable_from<Derived, Base>);
     static_assert(std::forward_iterator<PolyVector<int>::iterator>);
-
-    PolyVector<int> lol{1,2,3,4,5};
-
-    cout << "elements: ";
-    for (size_t i = 0; i < lol.size(); i++) {
-        cout << lol[i] << ", ";
-    }
-    cout << endl;
-
-
-    int a[2] {3,4};
-    int *p = static_cast<int*>(a);
-    cout << "dereference check: " << p[1] << endl;
-    cout << "start of program" << endl;
-    PolyVector<long> vec;
-    cout << "initialized vec" << endl;
-    vec.push_back(1);
-    cout << "first element: " << vec[0] << endl;
-    vec.push_back(3);
-    cout << "size: " << vec.size() << endl;
-
-    cout << "elements: ";
-    for (size_t i = 0; i < vec.size(); i++) {
-        cout << vec[i] << ", ";
-    }
-    cout << endl;
-
-
-    cout << "elements iterator: ";
-    for (auto it = vec.begin(); it != vec.end(); ++it) {
-        cout << *it << ", ";
-    }
-    cout << endl;
-    cout << "range initial capacity: " << vec.capacity() << std::endl;
-    cout << "elements range: ";
-    for (auto item : vec) {
-        cout << item << ", ";
-    }
-    cout << endl << "final capacity: " << vec.capacity() << std::endl;
-    cout << endl;
-
-    cout << "insert initial capacity: " << vec.capacity() << std::endl;
-    vec.insert(++vec.begin(), 2);
-    for (auto item : vec) {
-        cout << item << ", ";
-    }
-    cout << endl << "final capacity: " << vec.capacity() << std::endl;
-
-    cout << "insert initial capacity: " << vec.capacity() << std::endl;
-    vec.insert(++vec.begin(), 7);
-    vec.insert(++vec.begin(), 7);
-    for (auto item : vec) {
-        cout << item << ", ";
-    }
-    cout << endl << "final capacity: " << vec.capacity() << std::endl;
-
-    vec.erase_value(7);
-    for (auto item : vec) {
-        cout << item << ", ";
-    }
-    cout << endl << "final capacity: " << vec.capacity() << std::endl;
-
-    PolyVector<Base> polyvec;
-    polyvec.emplace_back<Base>();
-    polyvec.emplace_back<Derived>();
-
-    for (size_t i = 0; i < polyvec.size(); i++) {
-        polyvec[i].print();
-    }
-
-    polyvec.reserve(16);
-    for (size_t i = 0; i < polyvec.size(); i++) {
-        polyvec[i].print();
-    }
-
-
-
-}
+**/
