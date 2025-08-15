@@ -154,11 +154,14 @@ template<typename Base, typename Allocator>
 PolyVector<Base, Allocator>::~PolyVector() {
     if (data_ != nullptr) {
         Allocator allocator;
-        for (size_t index = 0; index < capacity_; ++index) {
+        for (size_t index = 0; index < size_; ++index) {
             data_[index].~Base();
         } 
         allocator.deallocate(data_, capacity_);
     }
+    data_ = nullptr;
+    size_ = 0;
+    capacity_ = 0;
 }
 
 // Element access

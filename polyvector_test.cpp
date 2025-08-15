@@ -5,8 +5,29 @@
 
 enum Type {BaseT, DerivedT};
 
+struct Counter {
+    int constructor_count {0};
+    int destructor_count {0};
+};
+
 class Base {
 public:
+    Counter *counter;
+    int data;
+
+    Base(Counter* counter_in, int data_in) : counter{counter_in}, data{data_in} {
+        ++(counter->constructor_count);
+    };
+
+    ~Base() {
+        ++(counter->destructor_count);
+    };
+
+    Base(Base&) = delete;
+    Base& operator=(Base&) = delete;
+    Base(Base&&) = delete;
+    Base& operator=(Base&&) = delete;
+
     virtual Type get_type() {
         return BaseT;
     }
@@ -14,6 +35,7 @@ public:
 
 class Derived : public Base {
 public:
+    Derived(Counter* counter_in, int data_in) : Base(counter_in, data_in) {};
     virtual Type get_type() {
         return DerivedT;
     }
@@ -193,9 +215,76 @@ TEST_CASE("pop_back") {
     CHECK(vec[1] == 2);
 }
 TEST_SUITE_END();
-/**
 
+TEST_SUITE_BEGIN("Polymorphic");
+TEST_CASE("emplace_back") {
+    Counter counter;
+    PolyVector<Base> vec;
+    vec.emplace_back<Base>(&counter, 1);
+    vec.emplace_back<Derived>(&counter, 2);
 
-    static_assert(emplaceable_from<Derived, Base>);
-    static_assert(std::forward_iterator<PolyVector<int>::iterator>);
-**/
+    CHECK(vec[0].get_type() == BaseT);
+    CHECK(vec[1].get_type() == DerivedT);
+    CHECK(vec[0].data == 1);
+    CHECK(vec[1].data == 2);
+    CHECK(counter.constructor_count == 2);
+    CHECK(counter.destructor_count == 0);
+}
+
+TEST_CASE("Polymorphic resize") {
+    Counter counter;
+    PolyVector<Base> vec;
+    vec.emplace_back<Base>(&counter, 1);
+    vec.emplace_back<Derived>(&counter, 2);
+
+    vec.reserve(10);
+
+    CHECK(vec[0].get_type() == BaseT);
+    CHECK(vec[1].get_type() == DerivedT);
+    CHECK(vec[0].data == 1);
+    CHECK(vec[1].data == 2);
+    CHECK(counter.constructor_count == 2);
+    CHECK(counter.destructor_count == 0);
+    CHECK(vec.size() == 2);
+}
+
+TEST_CASE("Polymorphic pop") {
+    Counter counter;
+    PolyVector<Base> vec;
+    vec.emplace_back<Base>(&counter, 1);
+    vec.emplace_back<Derived>(&counter, 2);
+
+    vec.pop_back();
+
+    CHECK(vec[0].get_type() == BaseT);
+    CHECK(vec[0].data == 1);
+    CHECK(counter.constructor_count == 2);
+    CHECK(counter.destructor_count == 1);
+    CHECK(vec.size() == 1);
+}
+
+TEST_CASE("Polymorphic clear") {
+    Counter counter;
+    PolyVector<Base> vec;
+    vec.emplace_back<Base>(&counter, 1);
+    vec.emplace_back<Derived>(&counter, 2);
+
+    vec.clear();
+
+    CHECK(counter.constructor_count == 2);
+    CHECK(counter.destructor_count == 2);
+    CHECK(vec.size() == 0);
+}
+
+TEST_CASE("Polymorphic destructor") {
+    Counter counter;
+    PolyVector<Base> vec;
+    vec.emplace_back<Base>(&counter, 1);
+    vec.emplace_back<Derived>(&counter, 2);
+    
+    vec.~PolyVector();
+
+    CHECK(counter.constructor_count == 2);
+    CHECK(counter.destructor_count == 2);
+}
+TEST_SUITE_END();
